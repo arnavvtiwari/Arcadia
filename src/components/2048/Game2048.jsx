@@ -1,174 +1,160 @@
-import React, { useState, useEffect } from "react";
-import { useSwipeable } from "react-swipeable"; // Import swipeable hooks
-
-const SIZE = 4; // Size of the grid
-
-// Initialize the board with zeros
-const initializeBoard = () => {
-  const board = Array(SIZE)
-    .fill()
-    .map(() => Array(SIZE).fill(0));
-  return addRandomTile(addRandomTile(board));
-};
-
-// Add a random tile (2 or 4) to an empty spot on the board
-const addRandomTile = (board) => {
-  const emptySpaces = [];
-  for (let row = 0; row < SIZE; row++) {
-    for (let col = 0; col < SIZE; col++) {
-      if (board[row][col] === 0) emptySpaces.push([row, col]);
-    }
-  }
-  if (emptySpaces.length === 0) return board;
-  const [randomRow, randomCol] = emptySpaces[Math.floor(Math.random() * emptySpaces.length)];
-  board[randomRow][randomCol] = Math.random() < 0.9 ? 2 : 4;
-  return board;
-};
-
-// Check if two arrays are equal
-const arraysEqual = (arr1, arr2) =>
-  arr1.length === arr2.length && arr1.every((val, index) => val === arr2[index]);
-
-// Handle moving and merging tiles
-const slideAndMerge = (row) => {
-  let newRow = row.filter((val) => val !== 0); // Remove zeros
-  for (let i = 0; i < newRow.length - 1; i++) {
-    if (newRow[i] === newRow[i + 1]) {
-      newRow[i] *= 2;
-      newRow[i + 1] = 0;
-    }
-  }
-  newRow = newRow.filter((val) => val !== 0); // Remove the zeros after merging
-  return [...newRow, ...Array(SIZE - newRow.length).fill(0)];
-};
-
-// Handle moving the board in a given direction
-const move = (board, direction) => {
-  let newBoard = [...board];
-  if (direction === "left") {
-    newBoard = newBoard.map((row) => slideAndMerge(row));
-  } else if (direction === "right") {
-    newBoard = newBoard.map((row) => slideAndMerge(row.reverse()).reverse());
-  } else if (direction === "up") {
-    for (let col = 0; col < SIZE; col++) {
-      const colArray = newBoard.map((row) => row[col]);
-      const newCol = slideAndMerge(colArray);
-      newCol.forEach((val, rowIndex) => {
-        newBoard[rowIndex][col] = val;
-      });
-    }
-  } else if (direction === "down") {
-    for (let col = 0; col < SIZE; col++) {
-      const colArray = newBoard.map((row) => row[col]).reverse();
-      const newCol = slideAndMerge(colArray).reverse();
-      newCol.forEach((val, rowIndex) => {
-        newBoard[rowIndex][col] = val;
-      });
-    }
-  }
-  return newBoard;
-};
+import React, { useState } from "react";
 
 const Game2048 = () => {
-  const [board, setBoard] = useState(initializeBoard);
-  const [gameOver, setGameOver] = useState(false);
+  const [board, setBoard] = useState(generateInitialBoard());
+  const [score, setScore] = useState(0);
 
-  const handleKeyDown = (e) => {
-    if (gameOver) return;
-    let newBoard;
-    switch (e.key) {
-      case "ArrowLeft":
-        newBoard = move(board, "left");
+  // Function to generate the initial 4x4 board with two random tiles
+  function generateInitialBoard() {
+    const newBoard = Array(4).fill().map(() => Array(4).fill(0));
+    return addRandomTile(addRandomTile(newBoard));
+  }
+
+  // Function to add a random tile (either 2 or 4) in an empty spot
+  function addRandomTile(board) {
+    const emptyTiles = [];
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        if (board[i][j] === 0) {
+          emptyTiles.push([i, j]);
+        }
+      }
+    }
+
+    if (emptyTiles.length > 0) {
+      const [row, col] = emptyTiles[Math.floor(Math.random() * emptyTiles.length)];
+      const newBoard = board.map((r, rowIndex) =>
+        r.map((val, colIndex) =>
+          rowIndex === row && colIndex === col ? (Math.random() < 0.9 ? 2 : 4) : val
+        )
+      );
+      return newBoard;
+    }
+
+    return board;
+  }
+
+  // Handle directional movement (left, right, up, down)
+  function move(direction) {
+    let movedBoard;
+    switch (direction) {
+      case "up":
+        movedBoard = moveUp(board);
         break;
-      case "ArrowRight":
-        newBoard = move(board, "right");
+      case "down":
+        movedBoard = moveDown(board);
         break;
-      case "ArrowUp":
-        newBoard = move(board, "up");
+      case "left":
+        movedBoard = moveLeft(board);
         break;
-      case "ArrowDown":
-        newBoard = move(board, "down");
+      case "right":
+        movedBoard = moveRight(board);
         break;
       default:
         return;
     }
-    if (!arraysEqual(board, newBoard)) {
-      setBoard(addRandomTile(newBoard));
+
+    if (JSON.stringify(board) !== JSON.stringify(movedBoard)) {
+      setBoard(addRandomTile(movedBoard));
     }
-  };
+  }
 
-  // Swipe handlers for mobile support
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => handleSwipe("left"),
-    onSwipedRight: () => handleSwipe("right"),
-    onSwipedUp: () => handleSwipe("up"),
-    onSwipedDown: () => handleSwipe("down"),
-    preventDefaultTouchmoveEvent: true,
-    trackTouch: true,
-  });
+  function moveLeft(board) {
+    return board.map(row => slideAndMerge(row));
+  }
 
-  const handleSwipe = (direction) => {
-    if (gameOver) return;
-    let newBoard = move(board, direction);
-    if (!arraysEqual(board, newBoard)) {
-      setBoard(addRandomTile(newBoard));
-    }
-  };
+  function moveRight(board) {
+    return board.map(row => slideAndMerge(row.reverse()).reverse());
+  }
 
-  // Check if there are no moves left
-  const checkGameOver = () => {
-    for (let row = 0; row < SIZE; row++) {
-      for (let col = 0; col < SIZE; col++) {
-        if (board[row][col] === 0) return false;
-        if (row > 0 && board[row][col] === board[row - 1][col]) return false;
-        if (col > 0 && board[row][col] === board[row][col - 1]) return false;
+  function moveUp(board) {
+    const rotated = rotateLeft(board);
+    const moved = rotated.map(row => slideAndMerge(row));
+    return rotateRight(moved);
+  }
+
+  function moveDown(board) {
+    const rotated = rotateLeft(board);
+    const moved = rotated.map(row => slideAndMerge(row.reverse()).reverse());
+    return rotateRight(moved);
+  }
+
+  function slideAndMerge(row) {
+    const newRow = row.filter(value => value !== 0); // Remove zeroes
+    const mergedRow = [];
+    let skip = false;
+
+    for (let i = 0; i < newRow.length; i++) {
+      if (skip) {
+        skip = false;
+        continue;
+      }
+
+      if (i < newRow.length - 1 && newRow[i] === newRow[i + 1]) {
+        mergedRow.push(newRow[i] * 2);
+        setScore(prev => prev + newRow[i] * 2);
+        skip = true;
+      } else {
+        mergedRow.push(newRow[i]);
       }
     }
-    return true;
-  };
 
-  useEffect(() => {
-    setGameOver(checkGameOver());
-  }, [board]);
+    // Fill the remaining spaces with zeroes
+    return [...mergedRow, ...Array(4 - mergedRow.length).fill(0)];
+  }
 
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  });
+  function rotateLeft(matrix) {
+    return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex])).reverse();
+  }
 
-  const tileColors = {
-    2: "bg-yellow-100",
-    4: "bg-yellow-200",
-    8: "bg-yellow-300",
-    16: "bg-yellow-400",
-    32: "bg-orange-500 text-white",
-    64: "bg-orange-600 text-white",
-    128: "bg-yellow-500 text-white",
-    256: "bg-yellow-600 text-white",
-    512: "bg-yellow-700 text-white",
-    1024: "bg-yellow-800 text-white",
-    2048: "bg-yellow-900 text-white",
-  };
+  function rotateRight(matrix) {
+    return rotateLeft(rotateLeft(rotateLeft(matrix)));
+  }
 
   return (
-    <div className="flex flex-col items-center mt-10">
-      {gameOver && <div className="text-4xl font-bold text-red-600 mb-4">Game Over</div>}
-      <div
-        {...swipeHandlers} // Apply swipe handlers to the game container
-        className="grid grid-cols-4 grid-rows-4 gap-4"
-      >
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+      <h1 className="text-2xl font-bold mb-4">Score: {score}</h1>
+      <div className="grid grid-cols-4 gap-2 mb-4">
         {board.map((row, rowIndex) =>
-          row.map((value, colIndex) => (
+          row.map((tile, colIndex) => (
             <div
               key={`${rowIndex}-${colIndex}`}
-              className={`w-24 h-24 flex items-center justify-center font-bold text-xl ${
-                tileColors[value] || "bg-gray-300"
-              } rounded`}
+              className={`w-20 h-20 flex items-center justify-center text-2xl font-bold ${
+                tile === 0 ? "bg-gray-300" : `bg-yellow-${Math.min(Math.log2(tile), 7) * 100}`
+              }`}
             >
-              {value !== 0 ? value : ""}
+              {tile !== 0 && tile}
             </div>
           ))
         )}
+      </div>
+      <div className="flex flex-col space-y-2">
+        <button
+          className="bg-blue-500 text-white px-6 py-2 rounded"
+          onClick={() => move("up")}
+        >
+          Up
+        </button>
+        <div className="flex space-x-2">
+          <button
+            className="bg-blue-500 text-white px-6 py-2 rounded"
+            onClick={() => move("left")}
+          >
+            Left
+          </button>
+          <button
+            className="bg-blue-500 text-white px-6 py-2 rounded"
+            onClick={() => move("right")}
+          >
+            Right
+          </button>
+        </div>
+        <button
+          className="bg-blue-500 text-white px-6 py-2 rounded"
+          onClick={() => move("down")}
+        >
+          Down
+        </button>
       </div>
     </div>
   );
