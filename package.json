@@ -5,6 +5,8 @@
   "homepage": "https://arnavvtiwari.github.io/Arcadia/",
   "type": "module",
   "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
